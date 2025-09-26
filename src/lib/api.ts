@@ -1,93 +1,132 @@
 import qs from 'qs';
 
-const STRAPI_URL = process.env.STRAPI_URL || 'http://localhost:1337';
+const STRAPI_URL = process.env.STRAPI_URL || 'http://127.0.0.1:1337';
+const STRAPI_API_TOKEN = process.env.STRAPI_API_TOKEN;
 
 /**
- * A utility function to make API requests to Strapi.
+ * A generic fetch function to interact with the Strapi API.
+ * @param endpoint The API endpoint to call (e.g., '/trips').
+ * @param query The query parameters to append to the URL.
+ * @returns The JSON response from the API.
  */
-export async function fetchApi(endpoint: string, query?: Record<string, any>, options?: RequestInit) {
-    const defaultOptions = {
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        next: { revalidate: 60 } 
-    };
-    const mergedOptions = { ...defaultOptions, ...options };
-    
+async function fetchApi(endpoint: string, query: Record<string, any> = {}) {
     const queryString = qs.stringify(query, { encodeValuesOnly: true });
-    const requestUrl = `${STRAPI_URL}/api${endpoint}${queryString ? `?${queryString}` : ''}`;
+    const url = `${STRAPI_URL}/api${endpoint}?${queryString}`;
+
+    const headers = {
+        'Content-Type': 'application/json',
+        ...(STRAPI_API_TOKEN && { Authorization: `Bearer ${STRAPI_API_TOKEN}` }),
+    };
 
     try {
-        const response = await fetch(requestUrl, mergedOptions);
-        if (!response.ok) {
-            console.error(`Error fetching ${requestUrl}: ${response.statusText}`);
-            return null;
+        const res = await fetch(url, { headers, cache: 'no-store' }); // Use 'no-store' for development to always get fresh data
+        if (!res.ok) {
+            console.error(`Strapi API Error: ${res.status} ${res.statusText} for URL: ${url}`);
+            throw new Error('Failed to fetch data from Strapi');
         }
-        const data = await response.json();
-        return data;
+        return await res.json();
     } catch (error) {
-        console.error('Error in fetchApi:', error);
-        return null;
+        console.error('Error fetching from Strapi:', error);
+        return null; // Return null on error to handle gracefully in components
     }
 }
 
-// --- TRIPS API FUNCTIONS ---
+// --- Trip Functions ---
 
+/**
+ * Fetches all trips with their cover images.
+ * @returns A list of trip data objects.
+ */
 export async function getTrips() {
-    const query = { populate: ['featured_image'], sort: ['publishedAt:desc'] };
+    const query = {
+        populate: ['cover_image'],
+        sort: ['title:asc'],
+    };
     const res = await fetchApi('/trips', query);
     return res?.data || [];
 }
 
+/**
+ * Fetches a single trip by its slug.
+ * @param slug The unique slug of the trip.
+ * @returns A single trip data object or null if not found.
+ */
 export async function getTripBySlug(slug: string) {
-    const query = { filters: { slug: { $eq: slug } }, populate: ['featured_image', 'gallery'] };
+    const query = {
+        filters: { slug: { $eq: slug } },
+        populate: ['cover_image', 'gallery'],
+    };
     const res = await fetchApi('/trips', query);
     return res?.data?.[0] || null;
 }
 
-// --- STATIC PAGES API FUNCTIONS ---
+// --- Page Content Functions ---
 
+/**
+ * Fetches the content for the About Us page.
+ * @returns The about page data object.
+ */
 export async function getAboutPage() {
     const query = {
         populate: {
-            cover_image: { fields: ['url', 'alternativeText', 'formats'] },
-            team_members: { populate: { photo: { fields: ['url', 'alternativeText', 'formats'] } } }
-        }
+            team_members: {
+                populate: ['photo'],
+            },
+        },
     };
     const res = await fetchApi('/about-page', query);
     return res?.data || null;
 }
 
-// --- BLOG API FUNCTIONS ---
+/**
+ * Fetches the content for the Contact page.
+ * @returns The contact page data object.
+ */
+export async function getContactPage() {
+    const query = {
+        populate: '*',
+    };
+    const res = await fetchApi('/contact-page', query);
+    return res?.data || null;
+}
 
+
+// --- Blog & Community Functions ---
+
+/**
+ * Fetches all blog posts with their cover image and author.
+ * @returns A list of blog post data objects.
+ */
 export async function getBlogPosts() {
-    const query = { populate: ['cover_image', 'author'], sort: ['publishedAt:desc'] };
+    const query = {
+        populate: ['cover_image', 'author'],
+        sort: ['publishedAt:desc'],
+    };
     const res = await fetchApi('/blog-posts', query);
     return res?.data || [];
 }
 
-export async function getBlogPostBySlug(slug: string) {
+/**
+ * Fetches a single blog post by its slug.
+ * @param slug The unique slug of the blog post.
+ * @returns A single blog post data object or null if not found.
+ */
+export async function getPostBySlug(slug: string) {
     const query = {
         filters: { slug: { $eq: slug } },
-        populate: {
-            cover_image: { fields: ['url', 'alternativeText', 'formats'] },
-            author: { populate: { picture: { fields: ['url', 'alternativeText'] } } }
-        }
+        populate: ['cover_image', 'author'],
     };
     const res = await fetchApi('/blog-posts', query);
     return res?.data?.[0] || null;
 }
 
-// --- TESTIMONIALS API FUNCTION ---
-
 /**
- * Fetches all testimonials.
- * @returns An array of testimonial objects.
+ * Fetches all published testimonials.
+ * @returns A list of testimonial data objects.
  */
 export async function getTestimonials() {
     const query = {
-        populate: ['picture'],
-        sort: ['createdAt:desc'], // Show the newest testimonials first
+        sort: ['name:asc'],
     };
     const res = await fetchApi('/testimonials', query);
     return res?.data || [];
