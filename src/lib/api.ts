@@ -4,7 +4,6 @@ const STRAPI_URL = process.env.STRAPI_URL || 'http://localhost:1337';
 
 /**
  * A utility function to make API requests to Strapi.
- * This function remains unchanged.
  */
 export async function fetchApi(endpoint: string, query?: Record<string, any>, options?: RequestInit) {
     const defaultOptions = {
@@ -32,20 +31,28 @@ export async function fetchApi(endpoint: string, query?: Record<string, any>, op
     }
 }
 
-// ---------------------------------------------------------------- //
-// --- NEW FUNCTION ADDED BELOW ---                                 //
-// ---------------------------------------------------------------- //
+/**
+ * Fetches all trips for the main listing page.
+ */
+export async function getTrips() {
+    const query = {
+        populate: ['featured_image'],
+        sort: ['publishedAt:desc'],
+    };
+    const res = await fetchApi('/trips', query);
+    if (!res?.data) {
+        return [];
+    }
+    return res.data;
+}
+
 
 /**
  * Fetches a single trip by its slug.
- * This is the new function required for the trip detail page.
- * @param slug The slug of the trip to fetch.
- * @returns A single trip object or null if not found.
  */
 export async function getTripBySlug(slug: string) {
     const query = {
         filters: { slug: { $eq: slug } },
-        // Populate all relations to get the full data for the detail page
         populate: ['featured_image', 'gallery'], 
     };
     const res = await fetchApi('/trips', query);
@@ -54,7 +61,23 @@ export async function getTripBySlug(slug: string) {
         return null;
     }
 
-    // The API returns an array, so we return the first (and only) item
     return res.data[0];
+}
+
+/**
+ * Fetches the content for the "About Us" page.
+ */
+export async function getAboutPage() {
+    const query = {
+        populate: {
+            cover_image: { fields: ['url', 'alternativeText', 'formats'] },
+            team_members: { populate: { photo: { fields: ['url', 'alternativeText', 'formats'] } } }
+        }
+    };
+    const res = await fetchApi('/about-page', query);
+    if (!res?.data) {
+        return null;
+    }
+    return res.data;
 }
 
