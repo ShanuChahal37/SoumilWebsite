@@ -1,0 +1,92 @@
+import { getAboutPage } from '@/lib/api';
+import { StrapiMedia } from '@/types'; // Assuming you have a types file
+import Image from 'next/image';
+import { marked } from 'marked';
+import { notFound } from 'next/navigation';
+
+const STRAPI_URL = process.env.STRAPI_URL || 'http://localhost:1337';
+
+interface TeamMember {
+  id: number;
+  name: string;
+  role: string;
+  photo: {
+    data: StrapiMedia;
+  };
+}
+
+// A simple helper to get image URLs
+const getImageUrl = (media: StrapiMedia, format = 'medium') => {
+  const url = media?.attributes.formats?.[format]?.url || media?.attributes.url;
+  return `${STRAPI_URL}${url}`;
+};
+
+export default async function AboutPage() {
+  const aboutData = await getAboutPage();
+
+  if (!aboutData) {
+    notFound();
+  }
+
+  const { title, subtitle, main_content, cover_image, team_section_title, team_members } = aboutData.attributes;
+  const contentHtml = marked.parse(main_content);
+
+  return (
+    <div className="bg-white text-gray-800">
+      {/* Hero Section */}
+      <section className="relative h-[40vh] w-full flex items-center justify-center text-center text-white">
+        <Image
+          src={getImageUrl(cover_image.data)}
+          alt={cover_image.data.attributes.alternativeText || 'About us cover image'}
+          layout="fill"
+          objectFit="cover"
+          className="z-0"
+          priority
+        />
+        <div className="absolute inset-0 bg-black/50 z-10"></div>
+        <div className="relative z-20 px-4">
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">{title}</h1>
+          <p className="mt-2 text-lg md:text-xl text-gray-200">{subtitle}</p>
+        </div>
+      </section>
+
+      {/* Main Content Section */}
+      <section className="py-20">
+        <div className="container mx-auto px-6 max-w-4xl">
+          <article 
+            className="prose lg:prose-lg mx-auto"
+            dangerouslySetInnerHTML={{ __html: contentHtml }}
+          />
+        </div>
+      </section>
+
+      {/* Team Section */}
+      {team_members && team_members.length > 0 && (
+        <section className="bg-gray-50 py-20">
+          <div className="container mx-auto px-6">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-800">{team_section_title}</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {team_members.map((member: TeamMember) => (
+                <div key={member.id} className="text-center bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
+                  <div className="relative w-32 h-32 mx-auto mb-4">
+                    <Image
+                      src={getImageUrl(member.photo.data, 'thumbnail')}
+                      alt={member.name}
+                      layout="fill"
+                      objectFit="cover"
+                      className="rounded-full"
+                    />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">{member.name}</h3>
+                  <p className="text-teal-600">{member.role}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
