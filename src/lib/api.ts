@@ -1,14 +1,10 @@
-
 import qs from 'qs';
 
 const STRAPI_URL = process.env.STRAPI_URL || 'http://localhost:1337';
 
 /**
  * A utility function to make API requests to Strapi.
- * @param endpoint The API endpoint to call (e.g., '/trips').
- * @param query An object of query parameters.
- * @param options Additional fetch options.
- * @returns The JSON response from the API.
+ * This function remains unchanged.
  */
 export async function fetchApi(endpoint: string, query?: Record<string, any>, options?: RequestInit) {
     const defaultOptions = {
@@ -35,3 +31,30 @@ export async function fetchApi(endpoint: string, query?: Record<string, any>, op
         return null;
     }
 }
+
+// ---------------------------------------------------------------- //
+// --- NEW FUNCTION ADDED BELOW ---                                 //
+// ---------------------------------------------------------------- //
+
+/**
+ * Fetches a single trip by its slug.
+ * This is the new function required for the trip detail page.
+ * @param slug The slug of the trip to fetch.
+ * @returns A single trip object or null if not found.
+ */
+export async function getTripBySlug(slug: string) {
+    const query = {
+        filters: { slug: { $eq: slug } },
+        // Populate all relations to get the full data for the detail page
+        populate: ['featured_image', 'gallery'], 
+    };
+    const res = await fetchApi('/trips', query);
+
+    if (!res?.data || res.data.length === 0) {
+        return null;
+    }
+
+    // The API returns an array, so we return the first (and only) item
+    return res.data[0];
+}
+
